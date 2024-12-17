@@ -9,7 +9,8 @@ function g(row: number, col: number) {
 }
 
 type PosString = `${number},${number}`;
-const trailheads = new Map<PosString, Set<PosString>>();
+const trailheadsToEnds = new Map<PosString, Set<PosString>>();
+const trailheadsToTrails = new Map<PosString, Set<string>>();
 
 function addToMapSet<T, U>(map: Map<T, Set<U>>, key: T, value: U) {
   if (!map.has(key)) map.set(key, new Set<U>());
@@ -23,7 +24,8 @@ function explore(
   sourceCol: number,
   row: number,
   col: number,
-  seen: Set<PosString> = new Set()
+  seen: Set<PosString> = new Set(),
+  path: PosString[] = []
 ) {
   if (
     row >= 0 &&
@@ -34,18 +36,27 @@ function explore(
     ((trailheadRow === row && trailheadCol === col) ||
       g(row, col) === g(sourceRow, sourceCol) + 1)
   ) {
+    path = [...path, `${row},${col}`];
+    seen = new Set(seen);
+    seen.add(`${row},${col}`);
+
     if (g(row, col) === 9) {
       addToMapSet(
-        trailheads,
+        trailheadsToEnds,
         `${trailheadRow},${trailheadCol}`,
         `${row},${col}`
       );
+      addToMapSet(
+        trailheadsToTrails,
+        `${trailheadRow},${trailheadCol}`,
+        path.join("|")
+      );
     }
-    seen.add(`${row},${col}`);
-    explore(trailheadRow, trailheadCol, row, col, row + 1, col, seen);
-    explore(trailheadRow, trailheadCol, row, col, row - 1, col, seen);
-    explore(trailheadRow, trailheadCol, row, col, row, col + 1, seen);
-    explore(trailheadRow, trailheadCol, row, col, row, col - 1, seen);
+
+    explore(trailheadRow, trailheadCol, row, col, row + 1, col, seen, path);
+    explore(trailheadRow, trailheadCol, row, col, row - 1, col, seen, path);
+    explore(trailheadRow, trailheadCol, row, col, row, col + 1, seen, path);
+    explore(trailheadRow, trailheadCol, row, col, row, col - 1, seen, path);
   }
 }
 
@@ -55,9 +66,14 @@ for (let row = 0; row < height; row++) {
   }
 }
 
-console.log("trailheads", trailheads);
+// console.log("trailheads", trailheadsToEnds);
+console.log("trailheadsToTrails", trailheadsToTrails);
 
 console.log(
   "totalScore",
-  trailheads.values().reduce((total, set) => total + set.size, 0)
+  trailheadsToEnds.values().reduce((total, set) => total + set.size, 0)
+);
+console.log(
+  "totalRating",
+  trailheadsToTrails.values().reduce((total, set) => total + set.size, 0)
 );
