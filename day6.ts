@@ -9,19 +9,36 @@ function g(row: number, col: number) {
 
 const distinctPositions = new Set<`${number},${number}`>();
 
-let guardRow = 0;
-let guardCol = 0;
-let guardDirection: "^" | "v" | "<" | ">" = "^";
+interface Guard {
+  row: number;
+  col: number;
+  direction: "^" | "v" | "<" | ">";
+}
 
-function moveGuard(row: number, col: number) {
-  if (g(row, col) === "#") {
-    if (guardDirection === "^") guardDirection = ">";
-    else if (guardDirection === ">") guardDirection = "v";
-    else if (guardDirection === "v") guardDirection = "<";
-    else if (guardDirection === "<") guardDirection = "^";
+let guard: Readonly<Guard> = {
+  row: 0,
+  col: 0,
+  direction: "^",
+};
+
+function moveGuard(guard: Guard): Guard {
+  let desiredRow = guard.row;
+  let desiredCol = guard.col;
+
+  if (guard.direction === "^") desiredRow -= 1;
+  else if (guard.direction === "v") desiredRow += 1;
+  else if (guard.direction === ">") desiredCol += 1;
+  else if (guard.direction === "<") desiredCol -= 1;
+
+  if (g(desiredRow, desiredCol) === "#") {
+    let newDirection: typeof guard.direction;
+    if (guard.direction === "^") newDirection = ">";
+    else if (guard.direction === ">") newDirection = "v";
+    else if (guard.direction === "v") newDirection = "<";
+    else newDirection = "^";
+    return { row: guard.row, col: guard.col, direction: newDirection };
   } else {
-    guardRow = row;
-    guardCol = col;
+    return { row: desiredRow, col: desiredCol, direction: guard.direction };
   }
 }
 
@@ -33,23 +50,27 @@ for (let row = 0; row < height; row++) {
       g(row, col) === ">" ||
       g(row, col) === "<"
     ) {
-      guardRow = row;
-      guardCol = col;
-      guardDirection = g(row, col) as typeof guardDirection;
+      guard = {
+        row,
+        col,
+        direction: g(row, col) as typeof guard.direction,
+      };
       break;
     }
   }
 }
 
 while (true) {
-  distinctPositions.add(`${guardRow},${guardCol}`);
+  distinctPositions.add(`${guard.row},${guard.col}`);
 
-  if (guardDirection === "^") moveGuard(guardRow - 1, guardCol);
-  else if (guardDirection === "v") moveGuard(guardRow + 1, guardCol);
-  else if (guardDirection === ">") moveGuard(guardRow, guardCol + 1);
-  else if (guardDirection === "<") moveGuard(guardRow, guardCol - 1);
+  guard = moveGuard(guard);
 
-  if (guardRow < 0 || guardRow >= height || guardCol < 0 || guardCol >= width)
+  if (
+    guard.row < 0 ||
+    guard.row >= height ||
+    guard.col < 0 ||
+    guard.col >= width
+  )
     break;
 }
 
