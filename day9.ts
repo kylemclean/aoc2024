@@ -7,29 +7,41 @@ for (let i = 0, fileId = 0; i < input.length; i += 2, fileId++) {
   for (let j = 0; j < Number(input[i + 1]); j++) disk.push(-1);
 }
 
-let firstEmptyIndex = 0;
-let lastFullIndex = disk.length - 1;
+function moveBlocks(disk: number[]) {
+  disk = [...disk];
 
-while (true) {
-  // console.log(disk.map((x) => (x >= 0 ? x : ".")).join(""));
+  let firstEmptyIndex = 0;
+  let lastFullIndex = disk.length - 1;
 
-  while (firstEmptyIndex < disk.length && disk[firstEmptyIndex] >= 0)
-    firstEmptyIndex++;
+  while (true) {
+    while (firstEmptyIndex < disk.length && disk[firstEmptyIndex] >= 0)
+      firstEmptyIndex++;
 
-  if (firstEmptyIndex === disk.length) break;
+    if (firstEmptyIndex === disk.length) break;
 
-  while (lastFullIndex >= 0 && disk[lastFullIndex] < 0) lastFullIndex--;
+    while (lastFullIndex >= 0 && disk[lastFullIndex] < 0) lastFullIndex--;
 
-  if (lastFullIndex <= firstEmptyIndex) break;
+    if (lastFullIndex <= firstEmptyIndex) break;
 
-  disk[firstEmptyIndex] = disk[lastFullIndex];
-  disk[lastFullIndex] = -1;
+    disk[firstEmptyIndex] = disk[lastFullIndex];
+    disk[lastFullIndex] = -1;
+  }
+
+  return disk;
 }
 
-let checksum = 0;
+function calculateChecksum(disk: number[]) {
+  let checksum = 0;
 
-for (let i = 0; i < disk.length; i++) {
-  if (disk[i] >= 0) checksum += i * disk[i];
+  for (let i = 0; i < disk.length; i++) {
+    if (disk[i] >= 0) checksum += i * disk[i];
+  }
+
+  return checksum;
 }
 
-console.log("checksum", checksum);
+console.log("moveBlocksChecksum", calculateChecksum(moveBlocks(disk)));
+
+function printDisk(disk: number[]) {
+  console.log(disk.map((x) => (x >= 0 ? x : ".")).join(""));
+}
