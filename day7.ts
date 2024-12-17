@@ -7,23 +7,62 @@ const equations = lines.map((line) => {
   return { result, operands };
 });
 
-let sum = 0;
+// https://stackoverflow.com/a/24257996
+function permutation<T>(
+  options: T[],
+  permutationLength: number,
+  index: number
+) {
+  const output: T[] = [];
 
-for (const equation of equations) {
-  for (let i = 0; i < 2 ** (equation.operands.length - 1); i++) {
-    let acc = equation.operands[0];
-
-    for (let j = 1; j < equation.operands.length; j++) {
-      const operator = (i >> (j - 1)) & 1 ? "+" : "*";
-      const operand = equation.operands[j];
-      acc = operator === "+" ? acc + operand : acc * operand;
-    }
-
-    if (acc === equation.result) {
-      sum += acc;
-      break;
-    }
+  for (let i = 0; i < permutationLength; i++) {
+    const option = options[index % options.length];
+    index = Math.floor(index / options.length);
+    output.push(option);
   }
+
+  return output;
 }
 
-console.log("sum", sum);
+function calculateSum(
+  equations: { result: number; operands: number[] }[],
+  allowedOperators: ("+" | "*" | "||")[]
+) {
+  let sum = 0;
+
+  for (const equation of equations) {
+    for (
+      let i = 0;
+      i < allowedOperators.length ** (equation.operands.length - 1);
+      i++
+    ) {
+      const operators = permutation(
+        allowedOperators,
+        equation.operands.length - 1,
+        i
+      );
+      let acc = equation.operands[0];
+
+      for (let j = 0; j < operators.length; j++) {
+        const operator = operators[j];
+        const operand = equation.operands[j + 1];
+        acc =
+          operator === "+"
+            ? acc + operand
+            : operator === "*"
+            ? acc * operand
+            : Number(`${acc}${operand}`);
+      }
+
+      if (acc === equation.result) {
+        sum += acc;
+        break;
+      }
+    }
+  }
+
+  return sum;
+}
+
+console.log("sum", calculateSum(equations, ["+", "*"]));
+console.log("sumWithConcatenation", calculateSum(equations, ["+", "*", "||"]));
