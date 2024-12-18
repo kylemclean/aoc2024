@@ -1,53 +1,74 @@
 const text = await Bun.file("day15input.txt").text();
 const lines = text.split("\n");
 
-const grid: string[][] = [];
+type World = ReadonlyArray<ReadonlyArray<string>>;
+type MutableWorld = string[][];
 type Move = "^" | "v" | "<" | ">";
-const moves: Move[] = [];
 
-let robotRow = 0;
-let robotCol = 0;
+function readWorld(lines: string[]): World {
+  const world: string[][] = [];
 
-let finishedGrid = false;
-
-for (let row = 0; row < lines.length; row++) {
-  if (!finishedGrid) {
-    if (lines[row]) {
-      grid.push(lines[row].split(""));
-      const robotIndexInLine = lines[row].indexOf("@");
-      if (robotIndexInLine >= 0) {
-        robotRow = row;
-        robotCol = robotIndexInLine;
-      }
-    } else {
-      finishedGrid = true;
-    }
-  } else {
-    for (const char of lines[row]) moves.push(char as Move);
+  for (let row = 0; row < lines.length; row++) {
+    world.push(lines[row].split(""));
   }
+
+  return world;
 }
 
-const width = grid[0].length;
-const height = grid.length;
-
-function g(row: number, col: number) {
-  return grid[row]?.[col];
+function readMoves(lines: string[]): ReadonlyArray<Move> {
+  const moves: Move[] = [];
+  for (const line of lines) {
+    for (const char of line) {
+      moves.push(char as Move);
+    }
+  }
+  return moves;
 }
 
-function findFreeSpace(row: number, col: number, dRow: number, dCol: number) {
+function copyWorld(world: World): MutableWorld {
+  return world.map((row) => [...row]);
+}
+
+function width(world: World) {
+  return world[0].length;
+}
+
+function height(world: World) {
+  return world.length;
+}
+
+function findRobot(world: World) {
+  for (let row = 0; row < height(world); row++) {
+    for (let col = 0; col < width(world); col++) {
+      if (world[row][col] === "@") return { row, col };
+    }
+  }
+  throw new Error("No robot found");
+}
+
+function findFreeSpace(
+  world: World,
+  row: number,
+  col: number,
+  dRow: number,
+  dCol: number
+) {
   if (
     row < 0 ||
-    row >= height ||
+    row >= height(world) ||
     col < 0 ||
-    col >= width ||
-    g(row, col) === "#"
-  )
+    col >= width(world) ||
+    world[row][col] === "#"
+  ) {
     return undefined;
-  if (g(row, col) === ".") return { row, col };
-  return findFreeSpace(row + dRow, col + dCol, dRow, dCol);
+  }
+
+  if (world[row][col] === ".") return { row, col };
+
+  return findFreeSpace(world, row + dRow, col + dCol, dRow, dCol);
 }
 
-function moveRobot(move: Move) {
+function moveRobot(world: World, move: Move) {
   const [dRow, dCol] =
     move === "^"
       ? [-1, 0]
@@ -56,50 +77,71 @@ function moveRobot(move: Move) {
       : move === ">"
       ? [0, 1]
       : [0, -1];
-  const freeSpace = findFreeSpace(robotRow + dRow, robotCol + dCol, dRow, dCol);
+  const { row: robotRow, col: robotCol } = findRobot(world);
+
+  const freeSpace = findFreeSpace(
+    world,
+    robotRow + dRow,
+    robotCol + dCol,
+    dRow,
+    dCol
+  );
+
   if (freeSpace) {
-    grid[freeSpace.row][freeSpace.col] = grid[robotRow + dRow][robotCol + dCol];
-    grid[robotRow + dRow][robotCol + dCol] = grid[robotRow][robotCol];
-    grid[robotRow][robotCol] = ".";
-    robotRow = robotRow + dRow;
-    robotCol = robotCol + dCol;
+    const newWorld = copyWorld(world);
+    newWorld[freeSpace.row][freeSpace.col] =
+      newWorld[robotRow + dRow][robotCol + dCol];
+    newWorld[robotRow + dRow][robotCol + dCol] = newWorld[robotRow][robotCol];
+    newWorld[robotRow][robotCol] = ".";
+    return newWorld;
   }
 
-  // console.log("\n" + move);
-  // printGrid();
+  return world;
 }
 
-function executeMoves(moves: Move[]) {
-  for (const move of moves) moveRobot(move);
+function executeMoves(world: World, moves: ReadonlyArray<Move>) {
+  for (const move of moves) {
+    world = moveRobot(world, move);
+    // console.log("\n" + move);
+    // printWorld(world);
+  }
+
+  return world;
 }
 
 function gps(row: number, col: number) {
   return 100 * row + col;
 }
 
-function totalBoxGps() {
+function totalBoxGps(world: World) {
   let total = 0;
 
-  for (let row = 0; row < height; row++) {
-    for (let col = 0; col < width; col++) {
-      if (g(row, col) === "O") total += gps(row, col);
+  for (let row = 0; row < height(world); row++) {
+    for (let col = 0; col < width(world); col++) {
+      if (world[row][col] === "O") {
+        total += gps(row, col);
+      }
     }
   }
 
   return total;
 }
 
-function printGrid() {
-  for (let row = 0; row < height; row++) {
+function printWorld(world: World) {
+  for (let row = 0; row < height(world); row++) {
     let line = "";
-    for (let col = 0; col < width; col++) {
-      line += g(row, col);
+    for (let col = 0; col < width(world); col++) {
+      line += world[row][col];
     }
     console.log(line);
   }
 }
 
-// printGrid();
-executeMoves(moves);
+let world = readWorld(lines.slice(0, lines.indexOf("")));
+const moves = readMoves(lines.slice(lines.indexOf("") + 1));
 
-console.log("totalBoxGps", totalBoxGps());
+// printWorld(world);
+
+world = executeMoves(world, moves);
+
+console.log("totalBoxGps", totalBoxGps(world));
