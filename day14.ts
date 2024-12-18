@@ -77,3 +77,75 @@ function safetyFactor(
 
 const world = { width: 101, height: 103 };
 console.log("part1", safetyFactor(simulateRobots(robots, world, 100), world));
+
+function printWorld(
+  robots: ReadonlyArray<Robot>,
+  world: { width: number; height: number }
+) {
+  for (let y = 0; y < world.height; y++) {
+    let line = "";
+    for (let x = 0; x < world.width; x++) {
+      const count = robots.reduce(
+        (acc, robot) =>
+          acc + (robot.position.x === x && robot.position.y === y ? 1 : 0),
+        0
+      );
+      line += count > 0 ? count.toString()[0] : " ";
+    }
+    console.log(line);
+  }
+}
+
+function computeEntropy(
+  robots: ReadonlyArray<Robot>,
+  world: { width: number; height: number }
+) {
+  const array = new Uint8Array(world.width * world.height);
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const count = robots.reduce(
+        (acc, robot) =>
+          acc + (robot.position.x === x && robot.position.y === y ? 1 : 0),
+        0
+      );
+      array[y * world.width + x] = count > 0 ? 0xff : 0x00;
+    }
+  }
+  return (Bun.gzipSync(array).length / (world.width * world.height)) * 8;
+}
+
+let minEntropy = Infinity;
+let minEntropySeconds = -1;
+
+for (let seconds = 0; seconds < 1_000_000; seconds++) {
+  const simulated = simulateRobots(robots, world, seconds);
+  const entropy = computeEntropy(simulated, world);
+  if (entropy < minEntropy) {
+    minEntropy = entropy;
+    minEntropySeconds = seconds;
+  }
+  if (entropy < 0.4) {
+    console.log(
+      "seconds",
+      seconds,
+      "entropy",
+      entropy,
+      "minEntropy",
+      minEntropy,
+      "minEntropySeconds",
+      minEntropySeconds
+    );
+    printWorld(simulated, world);
+  } else if (seconds % 1000 === 0) {
+    console.log(
+      "seconds",
+      seconds,
+      "entropy",
+      entropy,
+      "minEntropy",
+      minEntropy,
+      "minEntropySeconds",
+      minEntropySeconds
+    );
+  }
+}
