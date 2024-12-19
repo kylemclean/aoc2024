@@ -4,27 +4,57 @@ const lines = text.split("\n").filter(Boolean);
 const patterns = lines[0].split(",").map((s) => s.trim());
 const designs = lines.slice(1);
 
-const cache = new Map<string, string[] | null>();
+const waysCache = new Map<string, number>();
 
-function getDesignPatterns(design: string): string[] | null {
-  if (design === "") return [];
+function getDesignPatternWays(design: string): number {
+  if (design === "") return 1;
 
-  const cached = cache.get(design);
+  const cached = waysCache.get(design);
   if (cached !== undefined) return cached;
 
-  const result = (() => {
-    for (const pattern of patterns) {
-      if (design.startsWith(pattern)) {
-        const restPatterns = getDesignPatterns(design.slice(pattern.length));
-        if (restPatterns) return [pattern, ...restPatterns];
-      }
-    }
+  let ways = 0;
 
-    return null;
-  })();
+  for (const pattern of patterns) {
+    if (!design.startsWith(pattern)) continue;
+    const restWays = getDesignPatternWays(design.slice(pattern.length));
+    ways += restWays;
+  }
 
-  cache.set(design, result);
-  return result;
+  waysCache.set(design, ways);
+  return ways;
 }
 
-console.log("possibleDesigns", designs.filter(getDesignPatterns).length);
+console.log(
+  "part1PossibleDesigns",
+  designs.filter((design) => getDesignPatternWays(design) > 0).length
+);
+
+console.log(
+  "part2PossibleDesigns",
+  designs.reduce((acc, design) => acc + getDesignPatternWays(design), 0)
+);
+
+const sequenceCache = new Map<string, string[][]>();
+
+function getDesignPatternSequences(design: string): string[][] {
+  console.log(design);
+  if (design === "") return [[]];
+
+  const cached = sequenceCache.get(design);
+  if (cached !== undefined) return cached;
+
+  const sequences: string[][] = [];
+
+  for (const pattern of patterns) {
+    if (!design.startsWith(pattern)) continue;
+    const restPatterns = getDesignPatternSequences(
+      design.slice(pattern.length)
+    );
+    for (const restPattern of restPatterns) {
+      sequences.push([pattern, ...restPattern]);
+    }
+  }
+
+  sequenceCache.set(design, sequences);
+  return sequences;
+}
