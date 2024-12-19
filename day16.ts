@@ -25,51 +25,57 @@ function findTile(world: World, tile: string) {
   throw new Error(`No ${tile} found`);
 }
 
-type State = `${number},${number},${Direction}`;
-
-function state({
-  row,
-  col,
-  direction,
-}: {
+type State = {
   row: number;
   col: number;
   direction: Direction;
-}): State {
+};
+type StateString = `${number},${number},${Direction}`;
+
+function stateString({ row, col, direction }: State): StateString {
   return `${row},${col},${direction}`;
 }
 
-function minCost(
+function state(stateString: StateString): State {
+  const [row, col, direction] = stateString.split(",");
+  return {
+    row: Number(row),
+    col: Number(col),
+    direction: direction as Direction,
+  };
+}
+
+function findPaths(
   world: World,
-  start: { row: number; col: number; direction: Direction },
+  start: State,
   goal: { row: number; col: number }
-): number {
-  const costTo = new Map<State, number>();
-  const prev = new Map<State, State>();
-  const visited = new Set<State>();
+): {
+  minCost: number;
+  paths: State[][];
+} {
+  const costTo = new Map<StateString, number>();
+  const prev = new Map<StateString, Set<StateString>>();
+  const visited = new Set<StateString>();
 
-  costTo.set(state(start), 0);
+  costTo.set(stateString(start), 0);
 
-  const moveQueue: { row: number; col: number; direction: Direction }[] = [
-    start,
-  ];
-  const rotateQueue: { row: number; col: number; direction: Direction }[] = [];
+  const moveQueue: State[] = [start];
+  const rotateQueue: State[] = [];
 
-  function updateWithEdge(
-    u: { row: number; col: number; direction: Direction },
-    v: { row: number; col: number; direction: Direction },
-    uToV: number
-  ) {
-    const alt = (costTo.get(state(u)) ?? Infinity) + uToV;
-    if (alt < (costTo.get(state(v)) ?? Infinity)) {
-      costTo.set(state(v), alt);
-      prev.set(state(v), state(u));
+  function updateWithEdge(u: State, v: State, uToV: number) {
+    const alt = (costTo.get(stateString(u)) ?? Infinity) + uToV;
+    if (alt <= (costTo.get(stateString(v)) ?? Infinity)) {
+      costTo.set(stateString(v), alt);
+      prev.set(
+        stateString(v),
+        (prev.get(stateString(v)) ?? new Set()).add(stateString(u))
+      );
     }
   }
 
   while (moveQueue.length > 0 || rotateQueue.length > 0) {
     const u = (moveQueue.length > 0 ? moveQueue : rotateQueue).splice(0, 1)[0];
-    visited.add(state(u));
+    visited.add(stateString(u));
 
     const moved = {
       north: { row: u.row - 1, col: u.col, direction: u.direction },
@@ -92,19 +98,19 @@ function minCost(
       west: { row: u.row, col: u.col, direction: "south" as const },
     }[u.direction];
 
-    if (world[moved.row][moved.col] !== "#" && !visited.has(state(moved)))
+    if (world[moved.row][moved.col] !== "#" && !visited.has(stateString(moved)))
       moveQueue.push(moved);
 
     if (
       world[rotatedCw.row][rotatedCw.col] !== "#" &&
-      !visited.has(state(rotatedCw))
+      !visited.has(stateString(rotatedCw))
     ) {
       rotateQueue.push(rotatedCw);
     }
 
     if (
       world[rotatedCcw.row][rotatedCcw.col] !== "#" &&
-      !visited.has(state(rotatedCcw))
+      !visited.has(stateString(rotatedCcw))
     ) {
       rotateQueue.push(rotatedCcw);
     }
@@ -114,12 +120,47 @@ function minCost(
     updateWithEdge(u, rotatedCcw, 1000);
   }
 
-  return Math.min(
-    costTo.get(state({ ...goal, direction: "north" })) ?? Infinity,
-    costTo.get(state({ ...goal, direction: "east" })) ?? Infinity,
-    costTo.get(state({ ...goal, direction: "south" })) ?? Infinity,
-    costTo.get(state({ ...goal, direction: "west" })) ?? Infinity
+  const goalStates = [
+    { ...goal, direction: "north" as const },
+    { ...goal, direction: "east" as const },
+    { ...goal, direction: "south" as const },
+    { ...goal, direction: "west" as const },
+  ];
+
+  const minCost = Math.min(
+    ...goalStates.map((state) => costTo.get(stateString(state)) ?? Infinity)
   );
+
+  const minCostGoalStates = goalStates.filter(
+    (state) => costTo.get(stateString(state)) === minCost
+  );
+
+  function buildPaths(toState: State, pathSoFar: State[] = []): State[][] {
+    if (stateString(toState) === stateString(start))
+      return [[...pathSoFar, toState]];
+
+    const previousStates = prev.get(stateString(toState));
+    if (!previousStates || previousStates.size === 0) throw new Error("Uh-oh!");
+
+    return previousStates
+      .values()
+      .toArray()
+      .flatMap((previousState) =>
+        buildPaths(state(previousState), [...pathSoFar, toState])
+      );
+  }
+
+  const paths = minCostGoalStates.flatMap((goalState) => buildPaths(goalState));
+
+  return { minCost, paths };
+}
+
+function tilesInPath(path: State[]) {
+  return new Set(path.map((state) => `${state.row},${state.col}`));
+}
+
+function tilesInAnyPath(paths: State[][]) {
+  return paths.map(tilesInPath).reduce((acc, tileSet) => acc.union(tileSet));
 }
 
 const world = readWorld(text.split("\n"));
@@ -127,4 +168,11 @@ const world = readWorld(text.split("\n"));
 const startTile = findTile(world, "S");
 const endTile = findTile(world, "E");
 
-console.log(minCost(world, { ...startTile, direction: "east" }, endTile));
+const { minCost, paths } = findPaths(
+  world,
+  { ...startTile, direction: "east" },
+  endTile
+);
+
+console.log("minCost", minCost);
+console.log("tilesInAnyPathCount", tilesInAnyPath(paths).size);
