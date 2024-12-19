@@ -72,26 +72,12 @@ function findRobot(world: World) {
   throw new Error("No robot found");
 }
 
-function findFreeSpace(
-  world: World,
-  row: number,
-  col: number,
-  dRow: number,
-  dCol: number
-) {
-  if (
-    row < 0 ||
-    row >= height(world) ||
-    col < 0 ||
-    col >= width(world) ||
-    world[row][col] === "#"
-  ) {
-    return undefined;
-  }
-
-  if (world[row][col] === ".") return { row, col };
-
-  return findFreeSpace(world, row + dRow, col + dCol, dRow, dCol);
+function isBox(world: World, row: number, col: number) {
+  return (
+    world[row][col] === "[" ||
+    world[row][col] === "]" ||
+    world[row][col] === "O"
+  );
 }
 
 function moveBoxes(
@@ -101,11 +87,15 @@ function moveBoxes(
   dRow: number,
   dCol: number
 ) {
+  if (!isBox(world, row, col)) return world;
+
   if (dCol !== 0 && dRow === 0) {
     if (world[row + dRow][col + dCol] === "#") return world;
 
     if (world[row + dRow][col + dCol] !== ".")
       world = moveBoxes(world, row + dRow, col + dCol, dRow, dCol);
+
+    if (world[row + dRow][col + dCol] !== ".") return world;
 
     const newWorld = copyWorld(world);
     newWorld[row + dRow][col + dCol] = world[row][col];
@@ -114,11 +104,13 @@ function moveBoxes(
     return newWorld;
   } else if (dCol === 0 && dRow !== 0) {
     const originalWorld = world;
-    const otherBoxPartColOffset = world[row][col] === "[" ? 1 : -1;
+    const otherBoxPartColOffset =
+      world[row][col] === "O" ? 0 : world[row][col] === "[" ? 1 : -1;
 
     if (
       world[row + dRow][col + dCol] === "#" ||
-      world[row + dRow][col + dCol + otherBoxPartColOffset] === "#"
+      (otherBoxPartColOffset &&
+        world[row + dRow][col + dCol + otherBoxPartColOffset] === "#")
     ) {
       return world;
     }
@@ -126,7 +118,10 @@ function moveBoxes(
     if (world[row + dRow][col + dCol] !== ".")
       world = moveBoxes(world, row + dRow, col + dCol, dRow, dCol);
 
-    if (world[row + dRow][col + dCol + otherBoxPartColOffset] !== ".")
+    if (
+      otherBoxPartColOffset &&
+      world[row + dRow][col + dCol + otherBoxPartColOffset] !== "."
+    ) {
       world = moveBoxes(
         world,
         row + dRow,
@@ -134,20 +129,24 @@ function moveBoxes(
         dRow,
         dCol
       );
+    }
 
     if (
       world[row + dRow][col + dCol] !== "." ||
-      world[row + dRow][col + dCol + otherBoxPartColOffset] !== "."
+      (otherBoxPartColOffset &&
+        world[row + dRow][col + dCol + otherBoxPartColOffset] !== ".")
     ) {
       return originalWorld;
     }
 
     const newWorld = copyWorld(world);
     newWorld[row + dRow][col + dCol] = world[row][col];
-    newWorld[row + dRow][col + dCol + otherBoxPartColOffset] =
-      world[row][col + otherBoxPartColOffset];
     newWorld[row][col] = ".";
-    newWorld[row][col + otherBoxPartColOffset] = ".";
+    if (otherBoxPartColOffset) {
+      newWorld[row + dRow][col + dCol + otherBoxPartColOffset] =
+        world[row][col + otherBoxPartColOffset];
+      newWorld[row][col + otherBoxPartColOffset] = ".";
+    }
     return newWorld;
   }
 
@@ -165,19 +164,8 @@ function moveRobot(world: World, move: Move) {
       : [0, -1];
   const { row: robotRow, col: robotCol } = findRobot(world);
 
-  const freeSpace = findFreeSpace(
-    world,
-    robotRow + dRow,
-    robotCol + dCol,
-    dRow,
-    dCol
-  );
-
-  if (!freeSpace) return world;
-
-  if (freeSpace.row !== robotRow + dRow || freeSpace.col !== robotCol + dCol) {
+  if (isBox(world, robotRow + dRow, robotCol + dCol))
     world = moveBoxes(world, robotRow + dRow, robotCol + dCol, dRow, dCol);
-  }
 
   if (world[robotRow + dRow][robotCol + dCol] !== ".") return world;
 
@@ -226,19 +214,15 @@ function printWorld(world: World) {
   }
 }
 
-let world = readWorld(lines.slice(0, lines.indexOf("")));
+const originalWorld = readWorld(lines.slice(0, lines.indexOf("")));
 const moves = readMoves(lines.slice(lines.indexOf("") + 1));
 
-// printWorld(world);
+// printWorld(originalWorld);
+console.log("totalBoxGps", totalBoxGps(executeMoves(originalWorld, moves)));
 
-// world = executeMoves(world, moves);
-
-// console.log("totalBoxGps", totalBoxGps(world));
-
-let widenedWorld = widenWorld(world);
-
-// printWorld(widenWorld(world));
-
-widenedWorld = executeMoves(widenedWorld, moves);
-
-console.log("widenedTotalBoxGps", totalBoxGps(widenedWorld));
+const widenedWorld = widenWorld(originalWorld);
+// printWorld(widenedWorld);
+console.log(
+  "widenedTotalBoxGps",
+  totalBoxGps(executeMoves(widenedWorld, moves))
+);
