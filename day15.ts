@@ -29,6 +29,32 @@ function copyWorld(world: World): MutableWorld {
   return world.map((row) => [...row]);
 }
 
+function widenWorld(sourceWorld: World): World {
+  const widenedWorld: string[][] = [];
+
+  for (let row = 0; row < height(sourceWorld); row++) {
+    const rowArray: string[] = [];
+    for (let col = 0; col < width(sourceWorld); col++) {
+      if (sourceWorld[row][col] === "#") {
+        rowArray.push("#");
+        rowArray.push("#");
+      } else if (sourceWorld[row][col] === "O") {
+        rowArray.push("[");
+        rowArray.push("]");
+      } else if (sourceWorld[row][col] === ".") {
+        rowArray.push(".");
+        rowArray.push(".");
+      } else if (sourceWorld[row][col] === "@") {
+        rowArray.push("@");
+        rowArray.push(".");
+      }
+    }
+    widenedWorld.push(rowArray);
+  }
+
+  return widenedWorld;
+}
+
 function width(world: World) {
   return world[0].length;
 }
@@ -68,6 +94,66 @@ function findFreeSpace(
   return findFreeSpace(world, row + dRow, col + dCol, dRow, dCol);
 }
 
+function moveBoxes(
+  world: World,
+  row: number,
+  col: number,
+  dRow: number,
+  dCol: number
+) {
+  if (dCol !== 0 && dRow === 0) {
+    if (world[row + dRow][col + dCol] === "#") return world;
+
+    if (world[row + dRow][col + dCol] !== ".")
+      world = moveBoxes(world, row + dRow, col + dCol, dRow, dCol);
+
+    const newWorld = copyWorld(world);
+    newWorld[row + dRow][col + dCol] = world[row][col];
+    newWorld[row + dRow][col] = world[row][col - dCol];
+    newWorld[row][col] = ".";
+    return newWorld;
+  } else if (dCol === 0 && dRow !== 0) {
+    const originalWorld = world;
+    const otherBoxPartColOffset = world[row][col] === "[" ? 1 : -1;
+
+    if (
+      world[row + dRow][col + dCol] === "#" ||
+      world[row + dRow][col + dCol + otherBoxPartColOffset] === "#"
+    ) {
+      return world;
+    }
+
+    if (world[row + dRow][col + dCol] !== ".")
+      world = moveBoxes(world, row + dRow, col + dCol, dRow, dCol);
+
+    if (world[row + dRow][col + dCol + otherBoxPartColOffset] !== ".")
+      world = moveBoxes(
+        world,
+        row + dRow,
+        col + dCol + otherBoxPartColOffset,
+        dRow,
+        dCol
+      );
+
+    if (
+      world[row + dRow][col + dCol] !== "." ||
+      world[row + dRow][col + dCol + otherBoxPartColOffset] !== "."
+    ) {
+      return originalWorld;
+    }
+
+    const newWorld = copyWorld(world);
+    newWorld[row + dRow][col + dCol] = world[row][col];
+    newWorld[row + dRow][col + dCol + otherBoxPartColOffset] =
+      world[row][col + otherBoxPartColOffset];
+    newWorld[row][col] = ".";
+    newWorld[row][col + otherBoxPartColOffset] = ".";
+    return newWorld;
+  }
+
+  throw new Error("not implemented");
+}
+
 function moveRobot(world: World, move: Move) {
   const [dRow, dCol] =
     move === "^"
@@ -87,16 +173,19 @@ function moveRobot(world: World, move: Move) {
     dCol
   );
 
-  if (freeSpace) {
-    const newWorld = copyWorld(world);
-    newWorld[freeSpace.row][freeSpace.col] =
-      newWorld[robotRow + dRow][robotCol + dCol];
-    newWorld[robotRow + dRow][robotCol + dCol] = newWorld[robotRow][robotCol];
-    newWorld[robotRow][robotCol] = ".";
-    return newWorld;
+  if (!freeSpace) return world;
+
+  if (freeSpace.row !== robotRow + dRow || freeSpace.col !== robotCol + dCol) {
+    world = moveBoxes(world, robotRow + dRow, robotCol + dCol, dRow, dCol);
   }
 
-  return world;
+  if (world[robotRow + dRow][robotCol + dCol] !== ".") return world;
+
+  let newWorld = copyWorld(world);
+  newWorld[robotRow + dRow][robotCol + dCol] = newWorld[robotRow][robotCol];
+  newWorld[robotRow][robotCol] = ".";
+
+  return newWorld;
 }
 
 function executeMoves(world: World, moves: ReadonlyArray<Move>) {
@@ -118,7 +207,7 @@ function totalBoxGps(world: World) {
 
   for (let row = 0; row < height(world); row++) {
     for (let col = 0; col < width(world); col++) {
-      if (world[row][col] === "O") {
+      if (world[row][col] === "O" || world[row][col] === "[") {
         total += gps(row, col);
       }
     }
@@ -142,6 +231,14 @@ const moves = readMoves(lines.slice(lines.indexOf("") + 1));
 
 // printWorld(world);
 
-world = executeMoves(world, moves);
+// world = executeMoves(world, moves);
 
-console.log("totalBoxGps", totalBoxGps(world));
+// console.log("totalBoxGps", totalBoxGps(world));
+
+let widenedWorld = widenWorld(world);
+
+// printWorld(widenWorld(world));
+
+widenedWorld = executeMoves(widenedWorld, moves);
+
+console.log("widenedTotalBoxGps", totalBoxGps(widenedWorld));
