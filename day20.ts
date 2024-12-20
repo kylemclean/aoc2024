@@ -91,32 +91,8 @@ const world = readWorld(lines);
 const startTile = findTile(world, "S");
 const endTile = findTile(world, "E");
 
-function bestNearby(
-  world: World,
-  row: number,
-  col: number,
-  costs: Map<`${number},${number}`, number>,
-  maxCost: number,
-  distance: number,
-  throughWalls: boolean,
-  visited = new Set<`${number},${number}`>()
-): { row: number; col: number; cost: number; leftoverDistance: number }[] {
-  if (visited.has(`${row},${col}`)) return [];
-
-  visited.add(`${row},${col}`);
-
-  if (distance === 0 || costs.get(`${row},${col}`) === 0) {
-    return [
-      {
-        row,
-        col,
-        cost: costs.get(`${row},${col}`)!,
-        leftoverDistance: distance,
-      },
-    ];
-  }
-
-  const neighbors = [
+function neighbors(row: number, col: number) {
+  return [
     [-1, 0],
     [1, 0],
     [0, -1],
@@ -128,31 +104,62 @@ function bestNearby(
     }))
     .filter(
       ({ row, col }) =>
-        row >= 0 &&
-        row < height(world) &&
-        col >= 0 &&
-        col < width(world) &&
-        (throughWalls || world[row][col] !== "#") &&
-        ((throughWalls && world[row][col] === "#") ||
-          costs.get(`${row},${col}`)! <= maxCost)
-    )
-    .flatMap(({ row, col }) =>
-      bestNearby(
-        world,
-        row,
-        col,
-        costs,
-        maxCost,
-        distance - 1,
-        throughWalls,
-        visited
-      )
+        row >= 0 && col >= 0 && row < height(world) && col < width(world)
     );
+}
 
-  return neighbors.filter((neighbor) => neighbor.cost <= maxCost);
+function nextAdjacent(
+  row: number,
+  col: number,
+  costs: Map<`${number},${number}`, number>
+) {
+  return neighbors(row, col)
+    .filter(({ row, col }) => world[row][col] !== "#")
+    .toSorted(
+      (a, b) =>
+        costs.get(`${a.row},${a.col}`)! - costs.get(`${b.row},${b.col}`)!
+    )[0];
+}
+
+function nextByCheating(
+  row: number,
+  col: number,
+  cheatTimeLeft: number,
+  costs: Map<`${number},${number}`, number>
+): { row: number; col: number; cheatTimeLeft: number }[] {
+  const queue = [{ row, col, cheatTimeLeft }];
+  const seen = new Set<`${number},${number}`>();
+  const nextOptions = [];
+
+  while (queue.length > 0) {
+    const item = queue.shift()!;
+
+    if (seen.has(`${item.row},${item.col}`)) continue;
+    seen.add(`${item.row},${item.col}`);
+
+    if (item.cheatTimeLeft > 0) {
+      queue.push(
+        ...neighbors(item.row, item.col).map((x) => ({
+          ...x,
+          cheatTimeLeft: item.cheatTimeLeft - 1,
+        }))
+      );
+    }
+
+    nextOptions.push(item);
+  }
+
+  return nextOptions
+    .map((x) => ({
+      ...x,
+      cost: costs.get(`${x.row},${x.col}`),
+    }))
+    .filter((x) => x.cost !== undefined)
+    .toSorted((a, b) => a.cost! - b.cost!);
 }
 
 function findCheatCount(
+  cheatLength: number,
   row: number,
   col: number,
   costs: Map<`${number},${number}`, number>,
@@ -167,37 +174,24 @@ function findCheatCount(
 
     if (cost === 0) break;
 
-    const bestWithCheating = bestNearby(world, row, col, costs, cost, 2, true);
+    const whereToCheatTo = nextByCheating(row, col, cheatLength, costs);
 
     for (const {
       row: neighborRow,
       col: neighborCol,
-      leftoverDistance,
-    } of bestWithCheating) {
+      cheatTimeLeft,
+    } of whereToCheatTo) {
       const costToCheatHere =
         timeElapsed +
-        2 -
-        leftoverDistance +
+        cheatLength -
+        cheatTimeLeft +
         costs.get(`${neighborRow},${neighborCol}`)!;
       if (costToCheatHere <= maxCost) {
         cheatCountUnderThreshold++;
       }
     }
 
-    const bestWithoutCheating = bestNearby(
-      world,
-      row,
-      col,
-      costs,
-      cost,
-      1,
-      false
-    );
-
-    const next = bestWithoutCheating[0];
-    row = next.row;
-    col = next.col;
-
+    ({ row, col } = nextAdjacent(row, col, costs));
     timeElapsed++;
   }
 
@@ -210,9 +204,22 @@ const costs = findCosts(world, endTile);
 const bestDurationWithoutCheating = costs.get(
   `${startTile.row},${startTile.col}`
 )!;
+
 console.log(
-  "fastCheatCount",
+  "part1",
   findCheatCount(
+    2,
+    startTile.row,
+    startTile.col,
+    costs,
+    bestDurationWithoutCheating - 100
+  )
+);
+
+console.log(
+  "part2",
+  findCheatCount(
+    20,
     startTile.row,
     startTile.col,
     costs,
