@@ -43,3 +43,41 @@ const tTriangles = triangles
   .toArray();
 
 console.log("tTriangles", tTriangles.length);
+
+function getMaximalCliques(nodes: ReadonlySet<string>) {
+  const cliques: ReadonlySet<string>[] = [];
+
+  // https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
+  function bronKerbosch(
+    clique: ReadonlySet<string>,
+    candidates: ReadonlySet<string>,
+    excluded: ReadonlySet<string>
+  ) {
+    if (candidates.size === 0 && excluded.size === 0) {
+      if (cliques.length > 0 && clique.size > cliques[0].size) {
+        cliques.length = 0;
+      }
+      if (cliques.length === 0 || clique.size >= cliques[0].size) {
+        cliques.push(clique);
+      }
+    }
+
+    for (const node of candidates) {
+      bronKerbosch(
+        clique.union(new Set([node])),
+        candidates.intersection(getConnections(node)),
+        excluded.intersection(getConnections(node))
+      );
+      candidates = candidates.difference(new Set([node]));
+      excluded = excluded.union(new Set([node]));
+    }
+  }
+
+  bronKerbosch(new Set(), nodes, new Set());
+
+  return cliques;
+}
+
+const largestCliques = getMaximalCliques(nodes);
+const password = largestCliques[0].values().toArray().sort().join(",");
+console.log("password", password);
